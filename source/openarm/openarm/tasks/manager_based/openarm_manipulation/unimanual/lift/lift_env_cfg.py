@@ -16,6 +16,7 @@
 from dataclasses import MISSING
 
 import isaaclab.sim as sim_utils
+import isaaclab.envs.mdp.observations as obs_mdp
 from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.assets import (
     ArticulationCfg,
@@ -32,6 +33,7 @@ from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
+from isaaclab.sensors import TiledCameraCfg
 from isaaclab.sensors.frame_transformer.frame_transformer_cfg import FrameTransformerCfg
 from isaaclab.sim.spawners.from_files.from_files_cfg import GroundPlaneCfg, UsdFileCfg
 from isaaclab.utils import configclass
@@ -59,6 +61,8 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     ee_frame: FrameTransformerCfg = MISSING
     # target object: will be populated by agent env cfg
     object: RigidObjectCfg | DeformableObjectCfg = MISSING
+    # optional distractor object
+    distractor: RigidObjectCfg | DeformableObjectCfg | None = None
 
     # Table
     table = AssetBaseCfg(
@@ -83,6 +87,41 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         prim_path="/World/light",
         spawn=sim_utils.DomeLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
+    # ------------------------------------------Navaneet----------------------------------------
+    # cameras
+    camera_link0: TiledCameraCfg = TiledCameraCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/openarm_link0/CameraLink0",
+        offset=TiledCameraCfg.OffsetCfg(
+            pos=(0.0, 0.0, 0.2),
+            rot=(-0.29884, 0.64086, -0.64086, 0.29884),
+        ),
+        data_types=["rgb"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=12.0,
+            focus_distance=400.0,
+            horizontal_aperture=20.955,
+            clipping_range=(0.1, 20.0),
+        ),
+        width=128,
+        height=128,
+    )
+    camera_fixed: TiledCameraCfg = TiledCameraCfg(
+        prim_path="{ENV_REGEX_NS}/CameraFixed",
+        offset=TiledCameraCfg.OffsetCfg(
+            pos=(1.6, 0.0, 1.0),
+            rot=(-0.32651, 0.62721, 0.62721, -0.32651),
+            convention="ros",
+        ),
+        data_types=["rgb"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0,
+            focus_distance=400.0,
+            horizontal_aperture=20.955,
+            clipping_range=(0.1, 20.0),
+        ),
+        width=128,
+        height=128,
+    )
 
 
 ##
@@ -98,7 +137,7 @@ class CommandsCfg:
         asset_name="robot",
         body_name=MISSING,  # will be set by agent env cfg
         resampling_time_range=(5.0, 5.0),
-        debug_vis=True,
+        debug_vis=False, # Navaneet: changed from True to False to disable debug visualization 
         ranges=mdp.UniformPoseCommandCfg.Ranges(
             pos_x=(0.2, 0.4),
             pos_y=(-0.2, 0.2),
@@ -157,7 +196,32 @@ class ObservationsCfg:
 
     # observation groups
     policy: PolicyCfg = PolicyCfg()
+# ------------------------------------------Navaneet----------------------------------------
+    @configclass
+    class CameraCfg(ObsGroup):
+        """Camera observations (RGB)."""
 
+        cam_link0 = ObsTerm(
+            func=obs_mdp.image,
+            params={
+                "sensor_cfg": SceneEntityCfg("camera_link0"),
+                "data_type": "rgb",
+            },
+        )
+        cam_fixed = ObsTerm(
+            func=obs_mdp.image,
+            params={
+                "sensor_cfg": SceneEntityCfg("camera_fixed"),
+                "data_type": "rgb",
+            },
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = False
+            self.concatenate_terms = False
+
+    camera: CameraCfg = CameraCfg()
+#------------------------------------------------------------------
 
 @configclass
 class EventCfg:
@@ -171,7 +235,7 @@ class EventCfg:
         params={
             "pose_range": {"x": (-0.1, 0.1), "y": (-0.25, 0.25), "z": (0.0, 0.0)},
             "velocity_range": {},
-            "asset_cfg": SceneEntityCfg("object", body_names="Object"),
+            "asset_cfg": SceneEntityCfg("object", body_names="Object.*"), # Navaneet: changed from "Object" to "Object.*" to match the new object configuration
         },
     )
 
