@@ -123,8 +123,24 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         height=128,
     )
 
-
-##
+    main_camera: TiledCameraCfg = TiledCameraCfg(
+        prim_path="{ENV_REGEX_NS}/MainCamera",
+        offset=TiledCameraCfg.OffsetCfg(
+            pos=(1.6, 0.0, 1.1),
+            rot=(-0.32651, 0.62721, 0.62721, -0.32651),
+            convention="ros",
+        ),
+        data_types=["rgb"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=20.0,
+            focus_distance=400.0,
+            horizontal_aperture=20.955,
+            clipping_range=(0.1, 20.0),
+        ),
+        width=640,
+        height=480,
+    )
+    ##
 # MDP settings
 ##
 
@@ -215,7 +231,13 @@ class ObservationsCfg:
                 "data_type": "rgb",
             },
         )
-
+        main_cam = ObsTerm(
+            func=obs_mdp.image,
+            params={
+                "sensor_cfg": SceneEntityCfg("main_camera"),
+                "data_type": "rgb",
+            },
+        )
         def __post_init__(self):
             self.enable_corruption = False
             self.concatenate_terms = False
